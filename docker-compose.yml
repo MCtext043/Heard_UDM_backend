@@ -1,0 +1,54 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: technostrelka
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/init-db.sql:/docker-entrypoint-initdb.d/01-init-test-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d technostrelka"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/technostrelka
+      SECRET_KEY: docker-dev-secret-change-me
+      ADMIN_API_KEY: docker-admin-key
+      PUBLIC_BASE_URL: http://localhost:8000
+      UPLOAD_DIR: /app/uploads
+    volumes:
+      - uploads_data:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+
+  pytest:
+    profiles: ["test"]
+    build: .
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/technostrelka_test
+      ADMIN_API_KEY: pytest-admin-key
+      SECRET_KEY: pytest-secret-key-for-jwt
+      PUBLIC_BASE_URL: http://testserver
+      UPLOAD_DIR: /tmp/pytest-uploads
+    command: pytest tests/ -v --tb=short
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./tests:/app/tests:ro
+
+volumes:
+  pgdata:
+  uploads_data:
