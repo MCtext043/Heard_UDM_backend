@@ -1,9 +1,14 @@
+from __future__ import annotations
+
 import json
 from datetime import datetime
 from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, Field, model_validator
+
+from app.utils.categories import review_bucket_for_type
+from app.utils.image_urls import is_valid_event_image_url
 
 
 def merge_event_image_urls(raw_json: str | None, img_url: str | None) -> list[str]:
@@ -19,13 +24,32 @@ def merge_event_image_urls(raw_json: str | None, img_url: str | None) -> list[st
     seen: set[str] = set()
     if img_url and img_url.strip():
         u = img_url.strip()
-        out.append(u)
-        seen.add(u)
+        if is_valid_event_image_url(u):
+            out.append(u)
+            seen.add(u)
     for u in urls:
-        if u not in seen:
+        if u in seen:
+            continue
+        if is_valid_event_image_url(u):
             out.append(u)
             seen.add(u)
     return out
+
+
+def pack_event_gallery_for_storage(
+    img_url: str | None,
+    urls: list[str] | None,
+) -> tuple[str | None, str | None]:
+    """
+    Единообразно чистит галерею перед записью в БД.
+    Возвращает (img_url, image_urls_json) или (None, None), если не осталось ни одного валидного URL.
+    """
+    ulist = [str(u).strip() for u in (urls or []) if u and str(u).strip()]
+    raw = json.dumps(ulist, ensure_ascii=False) if ulist else None
+    merged = merge_event_image_urls(raw, img_url)
+    if not merged:
+        return None, None
+    return merged[0], json.dumps(merged, ensure_ascii=False)
 
 
 class EventOut(BaseModel):
@@ -108,6 +132,34 @@ class EventCreate(BaseModel):
     status: str | None = None
     type: str | None = None
     review_bucket: str | None = None
+
+    @model_validator(mode="after")
+    def _validate_full_card(self) -> EventCreate:
+        from app.utils.event_validation import slugify_event_name, validate_event_dict_for_storage
+
+        slug = (self.slug or "").strip() or slugify_event_name(self.name)
+        bucket = (self.review_bucket or "").strip() or (review_bucket_for_type(self.type) or "")
+        gallery_json = None
+        if self.image_urls:
+            gallery_json = json.dumps(
+                [u.strip() for u in self.image_urls if u and str(u).strip()],
+                ensure_ascii=False,
+            )
+        validate_event_dict_for_storage(
+            {
+                "name": self.name.strip(),
+                "slug": slug,
+                "img_url": self.img_url,
+                "description": self.description,
+                "date_caption": self.date_caption,
+                "place": self.place,
+                "url": self.url,
+                "type": self.type,
+                "review_bucket": bucket,
+                "image_urls_json": gallery_json,
+            }
+        )
+        return self.model_copy(update={"slug": slug})
 
 
 class HomeCategoryCreate(BaseModel):

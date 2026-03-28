@@ -71,7 +71,10 @@ class Event(Base):
     ingest_key: Mapped[str | None] = mapped_column(String(160), unique=True, nullable=True, index=True)
     last_ingested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    favorites: Mapped[list["Favorite"]] = relationship(back_populates="event")
+    favorites: Mapped[list["Favorite"]] = relationship(
+        back_populates="event",
+        cascade="all, delete-orphan",
+    )
     reviews: Mapped[list["Review"]] = relationship(back_populates="event", cascade="all, delete-orphan")
 
 

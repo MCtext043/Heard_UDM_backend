@@ -1,3 +1,6 @@
+from zoneinfo import ZoneInfo
+
+from pydantic import computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -26,10 +29,17 @@ class Settings(BaseSettings):
 
     admin_api_key: str = ""
 
-    # Периодический импорт (adm.izh.ru + опционально RSS).
+    # Периодический импорт (RSS + внешние афиши + adm.izh.ru).
     ingest_enabled: bool = False  # в продакшене задайте INGEST_ENABLED=true
     ingest_interval_minutes: int = 360
     ingest_http_timeout: float = 45.0
+    # Часовой пояс для «актуальности» дат при отборе событий (Удмуртия / Самара).
+    ingest_timezone: str = "Europe/Samara"
+    # Строгий отбор: описание, ≥1 фото, конкретный адрес/площадка, дата не в прошлом.
+    ingest_strict_event_quality: bool = True
+    ingest_min_description_len: int = 40
+    ingest_min_images_per_event: int = 1
+    ingest_event_days_past_grace: int = 0
     default_event_place: str = "г. Ижевск, Удмуртская Респ., Россия"
     # Через запятую URL RSS (афиши учреждений Ижевска и т.п.).
     izhevsk_rss_feed_urls: str = ""
@@ -46,6 +56,61 @@ class Settings(BaseSettings):
     adm_izh_max_images_per_event: int = 30
     # Если в Docker/корпоративной сети падает TLS к adm.izh.ru — временно false (нежелательно в проде).
     adm_izh_verify_ssl: bool = True
+
+    # Visit Udmurtia — календарь событий (HTML + карточки).
+    visit_udm_enabled: bool = True
+    visit_udm_base_url: str = "https://visitudmurtia.org"
+    visit_udm_calendar_path: str = "/kalendar-sobytij/"
+    visit_udm_max_list_links: int = 120
+    visit_udm_max_detail_fetches: int = 80
+    visit_udm_detail_delay_sec: float = 0.12
+    visit_udm_verify_ssl: bool = True
+    visit_udm_max_images_per_event: int = 20
+
+    # Афиша Города Ижевск (Next.js).
+    afisha_goroda_enabled: bool = True
+    afisha_goroda_base_url: str = "https://izh.afishagoroda.ru"
+    afisha_goroda_events_path: str = "/events"
+    afisha_goroda_max_slugs: int = 150
+    afisha_goroda_max_detail_fetches: int = 90
+    afisha_goroda_detail_delay_sec: float = 0.12
+    # У части окружений TLS к izh.afishagoroda.ru падает (как у adm.izh) — при необходимости false.
+    afisha_goroda_verify_ssl: bool = False
+    afisha_goroda_max_images_per_event: int = 24
+
+    # Яндекс.Афиша (OG-теги на карточках; ссылки собираются с хабов города).
+    yandex_afisha_enabled: bool = True
+    yandex_afisha_base_url: str = "https://afisha.yandex.ru"
+    yandex_afisha_city_slug: str = "izhevsk"
+    # Пути хабов через запятую (относительно базы или полные URL).
+    yandex_afisha_hub_paths: str = (
+        "/izhevsk/main,/izhevsk/theatre,/izhevsk/events,/izhevsk/selections,"
+        "/izhevsk/cinema,/izhevsk/sport,/izhevsk"
+    )
+    yandex_afisha_max_events: int = 200
+    yandex_afisha_max_detail_fetches: int = 120
+    yandex_afisha_detail_delay_sec: float = 0.12
+    yandex_afisha_hub_delay_sec: float = 0.05
+    yandex_afisha_verify_ssl: bool = False
+    yandex_afisha_max_images_per_event: int = 8
+
+    # После импорта удалять события без полного набора полей (см. event_completeness).
+    ingest_purge_incomplete_after_run: bool = True
+    event_completeness_enabled: bool = True
+    # Если true — требуются также age, rating, schedule, status (часто пусты у импорта).
+    event_completeness_require_extras: bool = False
+    event_completeness_min_gallery_urls: int = 1
+    event_completeness_min_description_len: int = 30
+    # Отклонять названия в стиле «купить билеты», «билеты на …».
+    event_completeness_reject_ticket_marketing: bool = True
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def ingest_tz(self) -> ZoneInfo:
+        try:
+            return ZoneInfo(self.ingest_timezone)
+        except Exception:
+            return ZoneInfo("UTC")
 
 
 settings = Settings()

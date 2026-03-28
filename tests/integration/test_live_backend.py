@@ -143,8 +143,11 @@ def test_live_admin_create_event(live_client: httpx.Client) -> None:
         json={
             "name": f"Live smoke {uuid.uuid4().hex[:8]}",
             "type": "IT",
-            "description": "Создано live-тестом",
+            "description": "Создано live-тестом для проверки полной карточки события в API.",
+            "date_caption": "01.01.2030",
             "place": "Ижевск",
+            "url": "https://example.com/live-smoke",
+            "img_url": "https://example.com/poster.jpg",
         },
     )
     assert r.status_code == 201, r.text

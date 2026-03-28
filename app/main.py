@@ -1,18 +1,22 @@
+import logging
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy.exc import OperationalError
 
-from app.api.routers import api_router
 from app.config import settings
-from app.database import Base, engine
-from app import models as _models  # noqa: F401 — register ORM metadata
-from app.database import SessionLocal
+from app.database import Base, SessionLocal, engine
+from app import models as _models  # noqa: F401 — зарегистрировать таблицы в metadata
+from app.api.routers import api_router
 from app.models import HomeCategory
 from app.services import storage
 from app.services.ingest.scheduler import shutdown_ingest_scheduler, start_ingest_scheduler
+
+_log = logging.getLogger(__name__)
 
 
 def _seed_home_categories_if_empty() -> None:
@@ -31,9 +35,33 @@ def _seed_home_categories_if_empty() -> None:
         db.close()
 
 
+def _ensure_db_schema() -> None:
+    """
+    Создаёт таблицы при старте. Повторяет попытки при кратковременной недоступности Postgres
+    (иначе ingest и /events падают с «relation does not exist»).
+    """
+    import app.models  # noqa: F401 — на случай ленивых цепочек импортов
+
+    last: OperationalError | None = None
+    for attempt in range(1, 6):
+        try:
+            Base.metadata.create_all(bind=engine)
+            return
+        except OperationalError as e:
+            last = e
+            _log.warning(
+                "DB schema create_all attempt %s/5 failed (%s), retrying…",
+                attempt,
+                e,
+            )
+            time.sleep(min(2 * attempt, 10))
+    assert last is not None
+    raise last
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    Base.metadata.create_all(bind=engine)
+    _ensure_db_schema()
     storage.ensure_upload_root()
     _seed_home_categories_if_empty()
     start_ingest_scheduler()

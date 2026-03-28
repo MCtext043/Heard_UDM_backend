@@ -573,7 +573,23 @@ GET /api/v1/users/me/favorites/status?event_ids=<uuid1>&event_ids=<uuid2>
 
 **Тело:** нет.
 
-**Ответ 200:** JSON-объект со счётчиками импорта (ключи зависят от реализации `run_izhevsk_ingest`, например числа upsert для RSS и adm.izh).
+**Ответ 200:** JSON-объект со счётчиками импорта (`rss_*`, `visit_udm_*`, `afisha_*`, `adm_izh_*`, `yandex_afisha_*`, при включённой очистке — `events_purged_incomplete` и др.).
+
+---
+
+### `POST /admin/events/purge-incomplete` — **Admin**
+
+**Заголовок:** `X-Admin-Key`.
+
+**Тело:** нет.
+
+**Ответ 200:**
+
+```json
+{ "deleted": 0 }
+```
+
+Поле `deleted` — число удалённых строк `events`, не прошедших проверку полноты (см. `EVENT_COMPLETENESS_*` в конфиге). Если `EVENT_COMPLETENESS_ENABLED=false`, удалений не будет (`deleted` = 0).
 
 ---
 

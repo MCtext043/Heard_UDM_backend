@@ -57,8 +57,10 @@ def test_full_backend_happy_path(
             "name": "HappyPath Test Event",
             "slug": "test_happy_event",
             "type": "IT",
-            "description": "unique search phrase for tests",
+            "description": "unique search phrase for tests and full card validation",
+            "date_caption": "15.06.2030",
             "place": "Test Street",
+            "url": "https://example.com/events/happy-path",
             "img_url": "https://example.com/poster.jpg",
         },
     )

@@ -79,20 +79,43 @@ docker compose down -v
 
 Файлы загрузок (аватары, фото отзывов) хранятся в именованном томе **`uploads_data`**, внутри контейнера путь: `/app/uploads`. Статика отдаётся по префиксу **`/static/`** (см. `PUBLIC_BASE_URL`).
 
-## Импорт афиши (Ижевск)
+## Импорт афиши (Ижевск и Удмуртия)
 
-Фоновый планировщик (**APScheduler**) периодически подтягивает события:
+Фоновый планировщик (**APScheduler**) периодически подтягивает события (порядок прогона):
 
-1. **RSS** (опционально) — список URL в `IZHEVSK_RSS_FEED_URLS` через запятую; по умолчанию отбираются пункты, где в тексте есть «Ижевск» / «Удмурт» и т.п. (`RSS_REQUIRE_REGION_KEYWORD`). Поле **`place`**: `DEFAULT_EVENT_PLACE` и пометка источника.
-2. **[Календарь adm.izh.ru](https://adm.izh.ru/i/calendar-calendar)** — парсинг HTML: с календаря собираются **все картинки** из блока события; для части записей (до `ADM_IZH_MAX_DETAIL_FETCHES`) запрашивается карточка `calendar-viewevent` — **адрес** (полный почтовый формат с регионом, если на сайте указана только улица/объект), **описание**, **дополнительные фото** из карточки. В API: **`img_url`** — первая картинка, **`image_urls`** — полный список (в БД JSON в `image_urls_json`). Ключ: `adm_izh:<id>`.
+1. **RSS** (опционально) — `IZHEVSK_RSS_FEED_URLS`; фильтр по региону (`RSS_REQUIRE_REGION_KEYWORD`). **`ingest_key`**: `rss:<hash>`.
+2. **[Visit Udmurtia](https://visitudmurtia.org/kalendar-sobytij/)** — со страницы календаря собираются ссылки на карточки; для каждой карточки читаются **заголовок**, **дата** (русский текст), **описание**, блок **«Место проведения»**, **обложка и картинки** с `/upload/`. **`ingest_key`**: `visit_udm:<slug>`.
+3. **[Афиша Города (Ижевск)](https://izh.afishagoroda.ru/events)** — разбор **Next.js `__NEXT_DATA__`**: список slug’ов и детальная карточка (описание, площадка, сеансы с датами, изображения). **`ingest_key`**: `afisha_goroda:<slug>`. На части серверов TLS к этому хосту падает — в Docker по умолчанию `AFISHA_GORODA_VERIFY_SSL=false`.
+4. **[Календарь adm.izh.ru](https://adm.izh.ru/i/calendar-calendar)** — как раньше: календарь + карточки `calendar-viewevent`. **`ingest_key`**: `adm_izh:<id>`.
+5. **[Яндекс.Афиша](https://afisha.yandex.ru/izhevsk/main)** — ссылки на карточки собираются с хабов города (`YANDEX_AFISHA_HUB_PATHS`), на каждой карточке читаются **Open Graph** (`og:title`, `og:description`, `og:image`). **`ingest_key`**: `yandex_afisha:<город>:<рубрика>:<slug>`.
 
-У импортированных строк заполняется **`ingest_key`** (`rss:<hash>` или `adm_izh:<id>`).
+**Очистка БД:** после каждого прогона импорта (если `INGEST_PURGE_INCOMPLETE_AFTER_RUN=true`) удаляются события без полного набора полей: имя, slug, обложка, описание, дата (подпись), место, внешняя ссылка, тип, `review_bucket`, минимум одна картинка в галерее. Опционально `EVENT_COMPLETENESS_REQUIRE_EXTRAS=true` — дополнительно age, rating, schedule, status. Ручной вызов: `POST /api/v1/admin/events/purge-incomplete`.
+
+**Отбор «сходить сейчас» и качество контента** (включается `INGEST_STRICT_EVENT_QUALITY=true` по умолчанию):
+
+- дата окончания (или однодневная дата) **не раньше «сегодня»** в зоне `INGEST_TIMEZONE` (по умолчанию `Europe/Samara`);
+- **описание** не короче `INGEST_MIN_DESCRIPTION_LEN` символов;
+- минимум **`INGEST_MIN_IMAGES_PER_EVENT`** картинок (URL);
+- **адрес / площадка** не «голый» город: нужны улица, ДК/ТРЦ/venue в «ёлочках», населённый пункт с подробностью и т.п. (эвристика в `app/services/ingest/quality.py`).
+
+Исключение из автоматического парсинга: **Министерство по туризму УР** ([mintur.udmurt.ru](https://mintur.udmurt.ru)) публикует [событийный календарь](https://mintur.udmurt.ru/informatsiya-dlya-turistov/sobytiynyy-kalendar-turisticheskikh-meropriyatiy/) в основном **как PDF**, без стабильной HTML-афиши по отдельным мероприятиям. Пересечение по содержанию закрывается **Visit Udmurtia** и другими источниками. При появлении открытого API или RSS у Минтур — можно добавить отдельный модуль.
+
+У импортированных строк заполняется **`ingest_key`** и галерея в **`image_urls_json`** (в API — `image_urls`).
 
 | Переменная | Описание |
 |------------|----------|
 | `INGEST_ENABLED` | `true` / `false` — включить планировщик (в `docker-compose` для `api` уже `true`) |
 | `INGEST_INTERVAL_MINUTES` | Интервал, не меньше 15 минут |
-| `INGEST_HTTP_TIMEOUT` | Таймаут HTTP для RSS |
+| `INGEST_HTTP_TIMEOUT` | Таймаут HTTP для импорта |
+| `INGEST_TIMEZONE` | Зона для проверки «событие ещё не прошло» (например `Europe/Samara`) |
+| `INGEST_STRICT_EVENT_QUALITY` | Строгий фильтр: описание, фото, адрес, дата |
+| `INGEST_MIN_DESCRIPTION_LEN` | Мин. длина описания (символы) |
+| `INGEST_MIN_IMAGES_PER_EVENT` | Мин. число URL изображений |
+| `VISIT_UDM_*` | Лимиты и `VISIT_UDM_VERIFY_SSL` для visitudmurtia.org |
+| `AFISHA_GORODA_*` | Лимиты и `AFISHA_GORODA_VERIFY_SSL` для izh.afishagoroda.ru |
+| `YANDEX_AFISHA_*` | Город (`YANDEX_AFISHA_CITY_SLUG`), хабы, лимиты, `YANDEX_AFISHA_VERIFY_SSL` |
+| `INGEST_PURGE_INCOMPLETE_AFTER_RUN` | После импорта удалять неполные события |
+| `EVENT_COMPLETENESS_*` | Включение очистки и опционально age/rating/schedule/status |
 | `DEFAULT_EVENT_PLACE` | Адрес по умолчанию, если с сайта адрес не извлечён |
 | `IZHEVSK_RSS_FEED_URLS` | Через запятую URL RSS |
 | `RSS_REQUIRE_REGION_KEYWORD` | Фильтр по региону в тексте RSS |

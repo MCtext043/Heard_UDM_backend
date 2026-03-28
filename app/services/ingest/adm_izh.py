@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.models import Event
+from app.schemas.event import pack_event_gallery_for_storage
 from app.services.ingest.textutils import strip_html
 from app.utils.categories import review_bucket_for_type
 
@@ -283,8 +284,10 @@ def ingest_adm_izh(db: Session) -> dict[str, int]:
                         _log.debug("adm.izh detail %s: %s", eid, ex)
 
                 image_urls = _build_image_urls(base, cal_paths, detail_paths)
-                img_url = image_urls[0] if image_urls else None
-                image_urls_json = json.dumps(image_urls, ensure_ascii=False) if image_urls else None
+                img_url, image_urls_json = pack_event_gallery_for_storage(
+                    image_urls[0] if image_urls else None,
+                    image_urls,
+                )
 
                 ingest_key = f"adm_izh:{eid}"
                 slug_base = f"adm-izh-{eid}"[:512]

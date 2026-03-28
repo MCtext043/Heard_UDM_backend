@@ -41,8 +41,9 @@ services:
       UPLOAD_DIR: /app/uploads
       INGEST_ENABLED: "true"
       INGEST_INTERVAL_MINUTES: "360"
-      # adm.izh.ru: в контейнере часто падает verify TLS (цепочка не в стандартном bundle)
+      # adm.izh.ru / afisha: в контейнере часто падает verify TLS
       ADM_IZH_VERIFY_SSL: "false"
+      AFISHA_GORODA_VERIFY_SSL: "false"
     volumes:
       - uploads_data:/app/uploads
     depends_on:

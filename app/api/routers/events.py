@@ -1,4 +1,3 @@
-import json
 from datetime import datetime, timezone
 from typing import Annotated
 from uuid import UUID
@@ -11,7 +10,7 @@ from app.api.admin_deps import require_admin_key
 from app.api.deps import CurrentUser
 from app.database import get_db
 from app.models import Event, Review, ReviewPhoto
-from app.schemas.event import EventCreate, EventOut, EventRatingSummary
+from app.schemas.event import EventCreate, EventOut, EventRatingSummary, pack_event_gallery_for_storage
 from app.utils.categories import review_bucket_for_type
 from app.schemas.review import ReviewCreate, ReviewOut
 
@@ -42,13 +41,15 @@ def create_event(
     db: Annotated[Session, Depends(get_db)],
 ) -> Event:
     bucket = body.review_bucket or review_bucket_for_type(body.type)
-    gallery_json = None
-    if body.image_urls:
-        gallery_json = json.dumps([u.strip() for u in body.image_urls if u and str(u).strip()], ensure_ascii=False)
+    img_stored, gallery_json = pack_event_gallery_for_storage(
+        body.img_url,
+        body.image_urls,
+    )
+    slug = (body.slug or "").strip()
     ev = Event(
         name=body.name.strip(),
-        slug=(body.slug or "").strip() or None,
-        img_url=body.img_url,
+        slug=slug or None,
+        img_url=img_stored,
         image_urls_json=gallery_json,
         description=body.description,
         age=body.age,
