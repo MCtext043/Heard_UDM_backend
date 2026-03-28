@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.api.routers import api_router
@@ -11,6 +12,7 @@ from app import models as _models  # noqa: F401 — register ORM metadata
 from app.database import SessionLocal
 from app.models import HomeCategory
 from app.services import storage
+from app.services.ingest.scheduler import shutdown_ingest_scheduler, start_ingest_scheduler
 
 
 def _seed_home_categories_if_empty() -> None:
@@ -34,10 +36,24 @@ async def lifespan(_: FastAPI):
     Base.metadata.create_all(bind=engine)
     storage.ensure_upload_root()
     _seed_home_categories_if_empty()
+    start_ingest_scheduler()
     yield
+    shutdown_ingest_scheduler()
 
 
 app = FastAPI(title="Technostrelka API", version="1.0.0", lifespan=lifespan)
+
+_cors_raw = settings.cors_origins.strip()
+_cors_list = ["*"] if _cors_raw == "*" else [o.strip() for o in _cors_raw.split(",") if o.strip()]
+if not _cors_list:
+    _cors_list = ["*"]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_cors_list,
+    allow_credentials=_cors_list != ["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.include_router(api_router, prefix="/api/v1")
 

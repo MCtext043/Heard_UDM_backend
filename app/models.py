@@ -55,6 +55,8 @@ class Event(Base):
     name: Mapped[str] = mapped_column(String(512), nullable=False, index=True)
     slug: Mapped[str | None] = mapped_column(String(512), unique=True, nullable=True)
     img_url: Mapped[str | None] = mapped_column(String(2048))
+    # JSON-массив строк URL (обложка дублируется в img_url при импорте).
+    image_urls_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     description: Mapped[str | None] = mapped_column(Text)
     age: Mapped[str | None] = mapped_column(String(32))
     date_caption: Mapped[str | None] = mapped_column(String(512))
@@ -66,6 +68,8 @@ class Event(Base):
     type: Mapped[str | None] = mapped_column(String(64), index=True)
     review_bucket: Mapped[str | None] = mapped_column(String(64), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    ingest_key: Mapped[str | None] = mapped_column(String(160), unique=True, nullable=True, index=True)
+    last_ingested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     favorites: Mapped[list["Favorite"]] = relationship(back_populates="event")
     reviews: Mapped[list["Review"]] = relationship(back_populates="event", cascade="all, delete-orphan")

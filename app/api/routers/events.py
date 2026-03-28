@@ -1,4 +1,5 @@
-from datetime import datetime
+import json
+from datetime import datetime, timezone
 from typing import Annotated
 from uuid import UUID
 
@@ -41,10 +42,14 @@ def create_event(
     db: Annotated[Session, Depends(get_db)],
 ) -> Event:
     bucket = body.review_bucket or review_bucket_for_type(body.type)
+    gallery_json = None
+    if body.image_urls:
+        gallery_json = json.dumps([u.strip() for u in body.image_urls if u and str(u).strip()], ensure_ascii=False)
     ev = Event(
         name=body.name.strip(),
         slug=(body.slug or "").strip() or None,
         img_url=body.img_url,
+        image_urls_json=gallery_json,
         description=body.description,
         age=body.age,
         date_caption=body.date_caption,
@@ -132,7 +137,7 @@ def create_or_update_review(
     event = db.get(Event, event_id)
     if event is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
-    today = datetime.utcnow().strftime("%d.%m.%y")
+    today = datetime.now(timezone.utc).strftime("%d.%m.%y")
     existing = db.query(Review).filter_by(event_id=event_id, user_id=user.id).first()
     if existing:
         existing.rating = body.rating

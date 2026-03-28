@@ -1,0 +1,37 @@
+# Доступ с телефона в одной Wi‑Fi сети: другой порт хоста (8888) и именованная сеть Docker.
+# 1) Узнайте IPv4 ПК: Windows — ipconfig, смотрите адаптер Wi‑Fi / Ethernet.
+# 2) В .env в корне репозитория (рядом с compose) добавьте, подставив свой IP:
+#    MOBILE_PUBLIC_BASE_URL=http://192.168.x.x:8888
+# 3) Запуск:
+#    docker compose -f docker-compose.yml -f docker-compose.mobile.yml up --build -d
+# При необходимости откройте порт 8888 в брандмауэре Windows.
+#
+# Android Emulator: MOBILE_PUBLIC_BASE_URL=http://10.0.2.2:8888
+# iOS Simulator (на том же Mac, что и Docker): часто http://127.0.0.1:8888
+
+services:
+  db:
+    networks:
+      - technostrelka_lan
+
+  api:
+    ports:
+      - "8888:8000"
+    networks:
+      - technostrelka_lan
+    environment:
+      PUBLIC_BASE_URL: ${MOBILE_PUBLIC_BASE_URL:-http://127.0.0.1:8888}
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+
+  pytest:
+    networks:
+      - technostrelka_lan
+
+  live-pytest:
+    networks:
+      - technostrelka_lan
+
+networks:
+  technostrelka_lan:
+    name: technostrelka_lan
+    driver: bridge

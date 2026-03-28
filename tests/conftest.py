@@ -11,6 +11,7 @@ os.environ.setdefault(
 os.environ.setdefault("ADMIN_API_KEY", "pytest-admin-key")
 os.environ.setdefault("SECRET_KEY", "pytest-secret-key-for-jwt")
 os.environ.setdefault("PUBLIC_BASE_URL", "http://testserver")
+os.environ.setdefault("INGEST_ENABLED", "false")
 
 import pytest
 from fastapi.testclient import TestClient
@@ -35,11 +36,18 @@ def client(setup_database):
 
 @pytest.fixture
 def mock_llm(monkeypatch):
-    async def fake_openai_chat(messages: list[dict]) -> str:
+    async def fake_gigachat(
+        messages: list[dict],
+        *,
+        max_tokens: int | None = None,
+    ) -> str:
         first = messages[0] if messages else {}
-        content = first.get("content") or ""
-        if first.get("role") == "system" and "classifier" in content:
+        content = (first.get("content") or "").lower()
+        if first.get("role") == "system" and "классификатор" in content:
             return '{"category": "IT"}'
         return "Mock assistant reply."
 
-    monkeypatch.setattr("app.api.routers.assistant._openai_chat", fake_openai_chat)
+    monkeypatch.setattr(
+        "app.api.routers.assistant._call_gigachat_proxy",
+        fake_gigachat,
+    )

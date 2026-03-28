@@ -21,12 +21,28 @@ services:
     build: .
     ports:
       - "8000:8000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2).read()",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 25s
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/technostrelka
       SECRET_KEY: docker-dev-secret-change-me
       ADMIN_API_KEY: docker-admin-key
       PUBLIC_BASE_URL: http://localhost:8000
       UPLOAD_DIR: /app/uploads
+      INGEST_ENABLED: "true"
+      INGEST_INTERVAL_MINUTES: "360"
+      # adm.izh.ru: в контейнере часто падает verify TLS (цепочка не в стандартном bundle)
+      ADM_IZH_VERIFY_SSL: "false"
     volumes:
       - uploads_data:/app/uploads
     depends_on:
@@ -42,9 +58,25 @@ services:
       SECRET_KEY: pytest-secret-key-for-jwt
       PUBLIC_BASE_URL: http://testserver
       UPLOAD_DIR: /tmp/pytest-uploads
+      INGEST_ENABLED: "false"
     command: pytest tests/ -v --tb=short
     depends_on:
       db:
+        condition: service_healthy
+    volumes:
+      - ./tests:/app/tests:ro
+      - ./app:/app/app:ro
+
+  # Реальные HTTP-вызовы к поднятому api (без моков). Запуск: docker compose --profile live run --rm live-pytest
+  live-pytest:
+    profiles: ["live"]
+    build: .
+    environment:
+      LIVE_BACKEND_URL: http://api:8000
+      LIVE_ADMIN_API_KEY: docker-admin-key
+    command: pytest tests/integration -v -m live --tb=short
+    depends_on:
+      api:
         condition: service_healthy
     volumes:
       - ./tests:/app/tests:ro

@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 
 @pytest.fixture
 def unique_email() -> str:
-    return f"user_{uuid.uuid4().hex[:12]}@happy-path.test"
+    return f"user_{uuid.uuid4().hex[:12]}@example.com"
 
 
 def auth_headers(token: str) -> dict[str, str]:
@@ -198,6 +198,7 @@ def test_full_backend_happy_path(
 
     r = client.post(
         "/api/v1/assistant/chat",
+        headers=headers,
         json={"message": "What to see?"},
     )
     assert r.status_code == 200
