@@ -337,8 +337,9 @@ def test_is_event_complete_and_purge(db_session: Session, monkeypatch) -> None:
                 "event_completeness_enabled": True,
                 "event_completeness_require_extras": False,
                 "event_completeness_min_gallery_urls": 1,
-                "event_completeness_min_description_len": 30,
-                "event_completeness_reject_ticket_marketing": True,
+                "event_completeness_min_description_len": 0,
+                "event_completeness_require_description": False,
+                "event_completeness_reject_ticket_marketing": False,
             }
         ),
     )

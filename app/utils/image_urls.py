@@ -10,7 +10,7 @@ _RE_ADM_IZH_RES_RU_VOID = re.compile(
     r"/res_ru/0_event_\d+(?:_\d+)?/?(?:\?.*)?$",
     re.IGNORECASE,
 )
-# Любая картинка события: путь должен заканчиваться известным расширением (query отрезан urlparse).
+# Только adm.izh.ru /res_ru/: нужен «файл» с расширением; прочие CDN могут без .jpg в пути.
 _RE_IMAGE_FILE_EXT = re.compile(
     r"\.(jpe?g|png|gif|webp|bmp|svg)$",
     re.IGNORECASE,
@@ -39,8 +39,8 @@ def is_valid_event_image_url(url: str | None) -> bool:
     if "adm.izh.ru" in host and "/res_ru/" in path.lower():
         if _RE_ADM_IZH_RES_RU_VOID.search(path):
             return False
-    if not _RE_IMAGE_FILE_EXT.search(path):
-        return False
+        if not _RE_IMAGE_FILE_EXT.search(path):
+            return False
     return True
 
 

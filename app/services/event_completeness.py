@@ -12,8 +12,8 @@ from app.utils.event_validation import description_min_length_ok, name_rejects_t
 
 def is_event_complete(ev: Event) -> bool:
     """
-    Событие считается полным, если заполнены основные поля для карточки в приложении.
-    Опционально (event_completeness_require_extras) — также age, rating, schedule, status.
+    Для ленты достаточно: название, slug и ≥1 валидный URL картинки (обложка или галерея).
+    Прочие поля опциональны. Дополнительно: event_completeness_require_description / require_extras.
     """
     if not (ev.name or "").strip():
         return False
@@ -23,24 +23,12 @@ def is_event_complete(ev: Event) -> bool:
         return False
     if not (ev.slug or "").strip():
         return False
-    if not (ev.img_url or "").strip():
-        return False
-    if not (ev.description or "").strip():
-        return False
-    if not description_min_length_ok(ev.description):
-        return False
-    if not (ev.date_caption or "").strip():
-        return False
-    if not (ev.place or "").strip():
-        return False
-    if not (ev.url or "").strip():
-        return False
-    if not (ev.type or "").strip():
-        return False
-    if not (ev.review_bucket or "").strip():
-        return False
     urls = merge_event_image_urls(ev.image_urls_json, ev.img_url)
     if len(urls) < max(1, settings.event_completeness_min_gallery_urls):
+        return False
+    if settings.event_completeness_require_description and not description_min_length_ok(
+        ev.description
+    ):
         return False
     if settings.event_completeness_require_extras:
         if not (ev.age or "").strip():

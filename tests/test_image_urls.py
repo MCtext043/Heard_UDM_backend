@@ -21,8 +21,8 @@ def test_adm_izh_res_ru_requires_extension() -> None:
     assert is_valid_event_image_url("https://adm.izh.ru/res_ru/foo.webp") is True
 
 
-def test_any_host_requires_image_extension() -> None:
-    assert is_valid_event_image_url("https://cdn.example.com/img/abc123") is False
+def test_non_adm_may_have_no_extension() -> None:
+    assert is_valid_event_image_url("https://cdn.example.com/img/abc123") is True
     assert is_valid_event_image_url("https://cdn.example.com/img/abc123.jpg") is True
 
 

@@ -27,6 +27,21 @@ from app.utils.event_validation import (
     name_rejects_ticket_marketing,
 )
 
+_YANDEX_TITLE_SUFFIXES = (
+    " — Яндекс Афиша",
+    " — Яндекс Афиша",
+    " - Яндекс Афиша",
+    " - Yandex Afisha",
+)
+
+
+def _strip_yandex_title_suffix(raw: str) -> str:
+    t = (raw or "").strip()
+    for suf in _YANDEX_TITLE_SUFFIXES:
+        if t.endswith(suf):
+            t = t[: -len(suf)].strip()
+    return t
+
 _log = logging.getLogger(__name__)
 
 _RE_EVENT_PATH = re.compile(
@@ -105,9 +120,16 @@ def _parse_event_page(html: str, page_url: str, rub: str) -> dict[str, Any] | No
 
     core = extract_yandex_performance_core(og_title=title, og_description=desc)
     name = format_typed_event_name(core, rub)
-    if not name or name_rejects_ticket_marketing(name):
+    if name and settings.event_completeness_reject_ticket_marketing and name_rejects_ticket_marketing(
+        name
+    ):
+        name = ""
+    if not name:
+        name = strip_html(_strip_yandex_title_suffix(title), 512)[:512]
+    else:
+        name = strip_html(name, 512)[:512]
+    if not name:
         return None
-    name = strip_html(name, 512)[:512]
 
     date_caption = ""
     dm = _RE_DATE_DM.search(title) or _RE_DATE_DM.search(desc)
@@ -211,7 +233,7 @@ def ingest_yandex_afisha(db: Session) -> dict[str, int]:
                     time.sleep(settings.yandex_afisha_detail_delay_sec)
 
                 meta = _parse_event_page(dr.text, page_url, rub)
-                if not meta or not meta.get("date_caption") or not meta.get("place"):
+                if not meta:
                     stats["yandex_afisha_skipped"] += 1
                     continue
 

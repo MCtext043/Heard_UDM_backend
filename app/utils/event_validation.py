@@ -7,7 +7,6 @@ import re
 from typing import Any
 
 from app.config import settings
-from app.utils.categories import review_bucket_for_type
 
 # Рекламные / шаблонные заголовки Яндекс.Афиши и билетных витрин
 _RE_BUY_TICKETS = re.compile(
@@ -101,7 +100,7 @@ def name_rejects_ticket_marketing(name: str) -> bool:
 
 
 def description_min_length_ok(description: str | None) -> bool:
-    n = max(1, settings.event_completeness_min_description_len)
+    n = max(0, settings.event_completeness_min_description_len)
     return len((description or "").strip()) >= n
 
 
@@ -135,7 +134,10 @@ def _gallery_urls_from_data(data: dict[str, Any]) -> list[str]:
 
 
 def validate_event_dict_for_storage(data: dict[str, Any]) -> None:
-    """ValueError с пояснением, если запись нельзя сохранять как «полную» карточку."""
+    """
+    Минимум для хранения в БД: название, slug и хотя бы одна валидная картинка.
+    Описание, дата, место, ссылка, тип — опционально (дольше наполняются импортом/админкой).
+    """
     if not (data.get("name") or "").strip():
         raise ValueError("Укажите название события")
     if settings.event_completeness_reject_ticket_marketing and name_rejects_ticket_marketing(
@@ -147,27 +149,14 @@ def validate_event_dict_for_storage(data: dict[str, Any]) -> None:
         )
     if not (data.get("slug") or "").strip():
         raise ValueError("Укажите slug (короткий идентификатор в URL)")
-    if not (data.get("img_url") or "").strip():
-        raise ValueError("Нужна ссылка на обложку (img_url)")
-    if not description_min_length_ok(str(data.get("description") or "")):
-        n = settings.event_completeness_min_description_len
-        raise ValueError(f"Описание должно быть не короче {n} символов")
-    if not (data.get("date_caption") or "").strip():
-        raise ValueError("Заполните date_caption (дата/время для пользователя)")
-    if not (data.get("place") or "").strip():
-        raise ValueError("Заполните place (адрес или площадка)")
-    if not (data.get("url") or "").strip():
-        raise ValueError("Заполните url (источник)")
-    if not (data.get("type") or "").strip():
-        raise ValueError("Заполните type (категория)")
-    rb = (data.get("review_bucket") or "").strip()
-    if not rb and (data.get("type") or "").strip():
-        rb = (review_bucket_for_type(str(data.get("type"))) or "").strip()
-    if not rb:
-        raise ValueError("Заполните review_bucket (или type, из которого он выводится)")
     urls = _gallery_urls_from_data(data)
     if len(urls) < max(1, settings.event_completeness_min_gallery_urls):
         raise ValueError("Нужна минимум одна картинка в галерее (img_url или image_urls)")
+    if settings.event_completeness_require_description and not description_min_length_ok(
+        str(data.get("description") or "")
+    ):
+        n = settings.event_completeness_min_description_len
+        raise ValueError(f"Описание должно быть не короче {n} символов")
     if settings.event_completeness_require_extras:
         for k, label in (
             ("age", "age"),

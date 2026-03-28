@@ -35,9 +35,9 @@ class Settings(BaseSettings):
     ingest_http_timeout: float = 45.0
     # Часовой пояс для «актуальности» дат при отборе событий (Удмуртия / Самара).
     ingest_timezone: str = "Europe/Samara"
-    # Строгий отбор: описание, ≥1 фото, конкретный адрес/площадка, дата не в прошлом.
-    ingest_strict_event_quality: bool = True
-    ingest_min_description_len: int = 40
+    # Строгий отбор: описание, адрес, даты — при false больше событий с фото попадает в БД.
+    ingest_strict_event_quality: bool = False
+    ingest_min_description_len: int = 20
     ingest_min_images_per_event: int = 1
     ingest_event_days_past_grace: int = 0
     default_event_place: str = "г. Ижевск, Удмуртская Респ., Россия"
@@ -100,9 +100,11 @@ class Settings(BaseSettings):
     # Если true — требуются также age, rating, schedule, status (часто пусты у импорта).
     event_completeness_require_extras: bool = False
     event_completeness_min_gallery_urls: int = 1
-    event_completeness_min_description_len: int = 30
+    event_completeness_min_description_len: int = 0
+    # Требовать минимальную длину описания при сохранении (админка / валидация).
+    event_completeness_require_description: bool = False
     # Отклонять названия в стиле «купить билеты», «билеты на …».
-    event_completeness_reject_ticket_marketing: bool = True
+    event_completeness_reject_ticket_marketing: bool = False
 
     @computed_field  # type: ignore[prop-decorator]
     @property

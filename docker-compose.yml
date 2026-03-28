@@ -41,6 +41,9 @@ services:
       UPLOAD_DIR: /app/uploads
       INGEST_ENABLED: "true"
       INGEST_INTERVAL_MINUTES: "360"
+      # Больше событий в БД: главное — фото; описание/адрес не режут импорт.
+      INGEST_STRICT_EVENT_QUALITY: "false"
+      EVENT_COMPLETENESS_REJECT_TICKET_MARKETING: "false"
       # adm.izh.ru / afisha: в контейнере часто падает verify TLS
       ADM_IZH_VERIFY_SSL: "false"
       AFISHA_GORODA_VERIFY_SSL: "false"
