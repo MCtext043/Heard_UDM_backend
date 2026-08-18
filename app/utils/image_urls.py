@@ -36,6 +36,17 @@ def is_valid_event_image_url(url: str | None) -> bool:
     if not path:
         return False
     host = parsed.netloc.lower()
+    # Reject obvious placeholder / test hosts (never show on cards).
+    if host in {
+        "example.com",
+        "www.example.com",
+        "placehold.co",
+        "via.placeholder.com",
+        "placeholder.com",
+    }:
+        return False
+    if host.endswith(".example.com"):
+        return False
     if "adm.izh.ru" in host and "/res_ru/" in path.lower():
         if _RE_ADM_IZH_RES_RU_VOID.search(path):
             return False

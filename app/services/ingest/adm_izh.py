@@ -253,6 +253,26 @@ def ingest_adm_izh(db: Session) -> dict[str, int]:
             detail_budget = settings.adm_izh_max_detail_fetches if settings.adm_izh_fetch_details else 0
 
             for eid, data in rows:
+                # Skip clearly past calendar events (e.g. 2017 leftovers).
+                end_dt = data.get("end_dt") or data.get("start_dt")
+                if end_dt is not None:
+                    try:
+                        end_day = end_dt.date() if hasattr(end_dt, "date") else end_dt
+                        from datetime import date as date_cls
+
+                        from app.services.ingest.dates_ru import event_covers_today_or_future
+
+                        if not event_covers_today_or_future(
+                            end_day,
+                            end_day,
+                            date_cls.today(),
+                            days_past_grace=settings.ingest_event_days_past_grace,
+                        ):
+                            stats["adm_izh_skipped_past"] = stats.get("adm_izh_skipped_past", 0) + 1
+                            continue
+                    except Exception:
+                        pass
+
                 title = data["title"][:512]
                 ev_type = _type_from_title(title)
                 rb = review_bucket_for_type(ev_type)

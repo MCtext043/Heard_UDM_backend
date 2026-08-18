@@ -22,8 +22,13 @@ def test_adm_izh_res_ru_requires_extension() -> None:
 
 
 def test_non_adm_may_have_no_extension() -> None:
-    assert is_valid_event_image_url("https://cdn.example.com/img/abc123") is True
-    assert is_valid_event_image_url("https://cdn.example.com/img/abc123.jpg") is True
+    assert is_valid_event_image_url("https://avatars.mds.yandex.net/get-afishanew/123/abc") is True
+    assert is_valid_event_image_url("https://cdn.somecdn.net/img/abc123.jpg") is True
+
+
+def test_rejects_example_com_placeholder() -> None:
+    assert is_valid_event_image_url("https://example.com/poster.jpg") is False
+    assert is_valid_event_image_url("https://cdn.example.com/img/abc123") is False
 
 
 def test_merge_drops_invalid_keeps_valid() -> None:

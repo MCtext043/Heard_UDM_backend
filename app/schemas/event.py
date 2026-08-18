@@ -80,12 +80,14 @@ class EventOut(BaseModel):
         from app.models import Event as EventModel
 
         if isinstance(data, EventModel):
+            gallery = merge_event_image_urls(data.image_urls_json, data.img_url)
             return {
                 "id": data.id,
                 "name": data.name,
                 "slug": data.slug,
-                "img_url": data.img_url,
-                "image_urls": merge_event_image_urls(data.image_urls_json, data.img_url),
+                # Always expose a real cover from the cleaned gallery (never raw placeholders).
+                "img_url": gallery[0] if gallery else None,
+                "image_urls": gallery,
                 "description": data.description,
                 "age": data.age,
                 "date_caption": data.date_caption,

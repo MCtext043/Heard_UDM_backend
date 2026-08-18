@@ -11,10 +11,32 @@ from app.api.deps import CurrentUser
 from app.database import get_db
 from app.models import Event, Review, ReviewPhoto
 from app.schemas.event import EventCreate, EventOut, EventRatingSummary, pack_event_gallery_for_storage
+from app.services.event_freshness import is_event_current
 from app.utils.categories import review_bucket_for_type
 from app.schemas.review import ReviewCreate, ReviewOut
 
 router = APIRouter()
+
+
+def _list_current_events(
+    db: Session,
+    *,
+    type: str | None,
+    limit: int,
+    offset: int,
+    extra_where=None,
+) -> list[Event]:
+    """Пагинация по актуальным событиям (без прошедших дат вроде 2017)."""
+    stmt = select(Event).order_by(Event.created_at.desc())
+    if type:
+        stmt = stmt.where(Event.type == type)
+    if extra_where is not None:
+        stmt = stmt.where(extra_where)
+    # Берём запас, чтобы после фильтра по дате хватило на offset+limit.
+    pool_limit = min(2000, max(200, (offset + limit) * 8 + 50))
+    pool = list(db.scalars(stmt.limit(pool_limit)).all())
+    current = [ev for ev in pool if is_event_current(ev)]
+    return current[offset : offset + limit]
 
 
 @router.get("", response_model=list[EventOut])
@@ -24,10 +46,7 @@ def list_events(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
 ) -> list[Event]:
-    stmt = select(Event).offset(offset).limit(limit).order_by(Event.created_at.desc())
-    if type:
-        stmt = stmt.where(Event.type == type)
-    return list(db.scalars(stmt).all())
+    return _list_current_events(db, type=type, limit=limit, offset=offset)
 
 
 @router.post(
@@ -40,11 +59,20 @@ def create_event(
     body: EventCreate,
     db: Annotated[Session, Depends(get_db)],
 ) -> Event:
+    name_low = body.name.strip().lower()
+    if "smoke" in name_low or "smokecat" in name_low:
+        raise HTTPException(status_code=400, detail="Test/smoke events are not allowed")
+    url_low = (body.url or "").lower()
+    if "example.com" in url_low:
+        raise HTTPException(status_code=400, detail="example.com URLs are not allowed")
+
     bucket = body.review_bucket or review_bucket_for_type(body.type)
     img_stored, gallery_json = pack_event_gallery_for_storage(
         body.img_url,
         body.image_urls,
     )
+    if not img_stored:
+        raise HTTPException(status_code=400, detail="Valid event image is required")
     slug = (body.slug or "").strip()
     ev = Event(
         name=body.name.strip(),
@@ -76,19 +104,12 @@ def search_events(
     offset: int = Query(0, ge=0),
 ) -> list[Event]:
     term = f"%{q.strip()}%"
-    stmt = (
-        select(Event)
-        .where(
-            or_(
-                Event.name.ilike(term),
-                Event.description.ilike(term),
-                Event.place.ilike(term),
-            )
-        )
-        .offset(offset)
-        .limit(limit)
+    extra = or_(
+        Event.name.ilike(term),
+        Event.description.ilike(term),
+        Event.place.ilike(term),
     )
-    return list(db.scalars(stmt).all())
+    return _list_current_events(db, type=None, limit=limit, offset=offset, extra_where=extra)
 
 
 @router.get("/{event_id}/reviews", response_model=list[ReviewOut])

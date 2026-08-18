@@ -7,6 +7,7 @@ import logging
 from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.services.event_cleanup import purge_past_events, purge_test_data, repair_event_images
 from app.services.event_completeness import purge_incomplete_events
 from app.services.ingest.adm_izh import ingest_adm_izh
 from app.services.ingest.afisha_goroda import ingest_afisha_goroda
@@ -52,4 +53,23 @@ def run_izhevsk_ingest(db: Session, *, force: bool = False) -> dict[str, int]:
         except Exception:
             _log.exception("purge incomplete events failed")
             out["purge_incomplete_error"] = 1
+    try:
+        out["events_purged_past"] = purge_past_events(db)
+    except Exception:
+        _log.exception("purge past events failed")
+        out["purge_past_error"] = 1
+    try:
+        cleaned = purge_test_data(db)
+        out["events_purged_test"] = int(cleaned.get("events_deleted", 0))
+        out["categories_purged_test"] = int(cleaned.get("categories_deleted", 0))
+    except Exception:
+        _log.exception("purge test data failed")
+        out["purge_test_error"] = 1
+    try:
+        repaired = repair_event_images(db)
+        out["events_images_repaired"] = int(repaired.get("repaired", 0))
+        out["events_deleted_no_image"] = int(repaired.get("deleted_no_image", 0))
+    except Exception:
+        _log.exception("repair event images failed")
+        out["repair_images_error"] = 1
     return out

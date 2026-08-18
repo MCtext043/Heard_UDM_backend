@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -28,6 +28,9 @@ def create_home_category(
     body: HomeCategoryCreate,
     db: Annotated[Session, Depends(get_db)],
 ) -> HomeCategory:
+    blob = f"{body.name} {body.type}".lower()
+    if "smoke" in blob or "smokecat" in blob or "pytest" in blob:
+        raise HTTPException(status_code=400, detail="Test/smoke categories are not allowed")
     row = HomeCategory(name=body.name, type=body.type, sort_order=body.sort_order)
     db.add(row)
     db.commit()

@@ -36,6 +36,8 @@ _RE_ONE = re.compile(
     r"(\d{1,2})\s+(" + "|".join(sorted(_MONTHS.keys(), key=len, reverse=True)) + r")\s+(\d{4})",
     re.IGNORECASE,
 )
+_RE_DMY = re.compile(r"(\d{1,2})[./](\d{1,2})[./](\d{4})")
+_RE_YMD = re.compile(r"(\d{4})-(\d{1,2})-(\d{1,2})")
 
 
 def _parse_one(m: re.Match[str]) -> date | None:
@@ -51,7 +53,8 @@ def _parse_one(m: re.Match[str]) -> date | None:
 
 def parse_russian_date_span(raw: str | None) -> tuple[date | None, date | None]:
     """
-    Возвращает (start, end) по строке вида «15 июля 2026» или «12 июня 2026 - 13 июня 2026».
+    Возвращает (start, end) по строке вида «15 июля 2026», «12.06.2026», «2026-06-12»
+    или диапазону «12 июня 2026 - 13 июня 2026» / «01.06.2017 — 05.06.2017».
     Если один день — end == start.
     """
     s = (raw or "").strip()
@@ -65,6 +68,20 @@ def parse_russian_date_span(raw: str | None) -> tuple[date | None, date | None]:
             d = _parse_one(m)
             if d:
                 dates.append(d)
+                continue
+        m2 = _RE_DMY.search(part)
+        if m2:
+            try:
+                dates.append(date(int(m2.group(3)), int(m2.group(2)), int(m2.group(1))))
+                continue
+            except ValueError:
+                pass
+        m3 = _RE_YMD.search(part)
+        if m3:
+            try:
+                dates.append(date(int(m3.group(1)), int(m3.group(2)), int(m3.group(3))))
+            except ValueError:
+                pass
     if not dates:
         return None, None
     start = min(dates)

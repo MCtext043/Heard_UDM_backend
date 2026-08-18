@@ -60,8 +60,8 @@ def test_full_backend_happy_path(
             "description": "unique search phrase for tests and full card validation",
             "date_caption": "15.06.2030",
             "place": "Test Street",
-            "url": "https://example.com/events/happy-path",
-            "img_url": "https://example.com/poster.jpg",
+            "url": "https://afisha.yandex.ru/izhevsk/events/happy-path-test",
+            "img_url": "https://avatars.mds.yandex.net/get-afishanew/23114/e5a2ec09173247679a/orig",
         },
     )
     assert r.status_code == 201

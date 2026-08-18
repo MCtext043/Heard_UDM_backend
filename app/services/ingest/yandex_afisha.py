@@ -237,6 +237,24 @@ def ingest_yandex_afisha(db: Session) -> dict[str, int]:
                     stats["yandex_afisha_skipped"] += 1
                     continue
 
+                from datetime import date as date_cls
+
+                from app.services.ingest.dates_ru import (
+                    event_covers_today_or_future,
+                    parse_russian_date_span,
+                )
+
+                d_start, d_end = parse_russian_date_span(meta.get("date_caption"))
+                if d_start or d_end:
+                    if not event_covers_today_or_future(
+                        d_start,
+                        d_end,
+                        date_cls.today(),
+                        days_past_grace=settings.ingest_event_days_past_grace,
+                    ):
+                        stats["yandex_afisha_skipped_past"] = stats.get("yandex_afisha_skipped_past", 0) + 1
+                        continue
+
                 title = meta["name"]
                 rb = review_bucket_for_type(meta["type"])
                 slug_base = f"yandex-afisha-{city_sl}-{rub}-{slug}"[:512]

@@ -136,21 +136,40 @@ def test_live_admin_ingest(live_client: httpx.Client) -> None:
 
 
 @pytest.mark.skipif(not ADMIN_KEY, reason="Задайте LIVE_ADMIN_API_KEY")
-def test_live_admin_create_event(live_client: httpx.Client) -> None:
+def test_live_admin_rejects_smoke_and_example_urls(live_client: httpx.Client) -> None:
     r = live_client.post(
         "/api/v1/events",
         headers={"X-Admin-Key": ADMIN_KEY},
         json={
             "name": f"Live smoke {uuid.uuid4().hex[:8]}",
             "type": "IT",
-            "description": "Создано live-тестом для проверки полной карточки события в API.",
+            "description": "Создано live-тестом — должно быть отклонено.",
             "date_caption": "01.01.2030",
             "place": "Ижевск",
             "url": "https://example.com/live-smoke",
             "img_url": "https://example.com/poster.jpg",
         },
     )
+    assert r.status_code == 400, r.text
+
+
+@pytest.mark.skipif(not ADMIN_KEY, reason="Задайте LIVE_ADMIN_API_KEY")
+def test_live_admin_create_event(live_client: httpx.Client) -> None:
+    r = live_client.post(
+        "/api/v1/events",
+        headers={"X-Admin-Key": ADMIN_KEY},
+        json={
+            "name": f"Интеграционный концерт {uuid.uuid4().hex[:8]}",
+            "type": "IT",
+            "description": "Создано live-тестом для проверки полной карточки события в API.",
+            "date_caption": "01.01.2030",
+            "place": "Ижевск, ДК Металлург",
+            "url": "https://afisha.yandex.ru/izhevsk/concert/integration-qa",
+            "img_url": "https://avatars.mds.yandex.net/get-afishanew/23114/e5a2ec09173247679a/orig",
+        },
+    )
     assert r.status_code == 201, r.text
     ev = r.json()
     assert ev.get("name")
     assert ev.get("id")
+    assert ev.get("img_url")

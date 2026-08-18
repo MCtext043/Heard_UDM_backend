@@ -275,8 +275,8 @@ def _compose_server() -> str:
               UPLOAD_DIR: /app/uploads
               INGEST_ENABLED: "true"
               INGEST_INTERVAL_MINUTES: "360"
-              INGEST_STRICT_EVENT_QUALITY: "false"
-              EVENT_COMPLETENESS_REJECT_TICKET_MARKETING: "false"
+              INGEST_STRICT_EVENT_QUALITY: "true"
+              EVENT_COMPLETENESS_REJECT_TICKET_MARKETING: "true"
               ADM_IZH_VERIFY_SSL: "false"
               AFISHA_GORODA_VERIFY_SSL: "false"
             volumes:

@@ -1,3 +1,3 @@
-from app.services.ingest.runner import run_izhevsk_ingest
+"""Ingest package (RSS, afisha sources, runner)."""
 
-__all__ = ["run_izhevsk_ingest"]
+__all__: list[str] = []
