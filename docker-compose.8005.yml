@@ -6,7 +6,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: technostrelka
     ports:
-      - "5432:5432"
+      - "5434:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./docker/init-db.sql:/docker-entrypoint-initdb.d/01-init-test-db.sql:ro
@@ -17,21 +17,10 @@ services:
       retries: 10
       start_period: 10s
 
-  # Local free LLM (optional): llama.cpp server (OpenAI-compatible).
-  # Put a GGUF model file into ./models/ (see README).
-  llm:
-    profiles: ["llm"]
-    image: ghcr.io/ggml-org/llama.cpp:server
-    command:
-      ["-m", "/models/qwen2.5-0.5b-instruct-q4_k_m.gguf", "--host", "0.0.0.0", "--port", "8080", "-c", "2048", "--threads", "4"]
-    volumes:
-      - ./models:/models
-    restart: unless-stopped
-
   api:
     build: .
     ports:
-      - "8000:8000"
+      - "8005:8000"
     healthcheck:
       test:
         [
@@ -48,7 +37,7 @@ services:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/technostrelka
       SECRET_KEY: docker-dev-secret-change-me
       ADMIN_API_KEY: docker-admin-key
-      PUBLIC_BASE_URL: http://localhost:8000
+      PUBLIC_BASE_URL: http://localhost:8005
       UPLOAD_DIR: /app/uploads
       INGEST_ENABLED: "true"
       INGEST_INTERVAL_MINUTES: "360"
@@ -58,13 +47,6 @@ services:
       # adm.izh.ru / afisha: в контейнере часто падает verify TLS
       ADM_IZH_VERIFY_SSL: "false"
       AFISHA_GORODA_VERIFY_SSL: "false"
-      # Assistant (by default uses deterministic fallback; enable LLM by setting ASSISTANT_PROVIDER=llamacpp_http)
-      ASSISTANT_PROVIDER: ${ASSISTANT_PROVIDER:-rules}
-      ASSISTANT_BASE_URL: ${ASSISTANT_BASE_URL:-http://llm:8080/v1}
-      ASSISTANT_MODEL: ${ASSISTANT_MODEL:-Qwen2.5-0.5B-Instruct}
-      ASSISTANT_MAX_TOKENS: ${ASSISTANT_MAX_TOKENS:-256}
-      ASSISTANT_TEMPERATURE: ${ASSISTANT_TEMPERATURE:-0.2}
-      ASSISTANT_TIMEOUT: ${ASSISTANT_TIMEOUT:-120.0}
     volumes:
       - uploads_data:/app/uploads
     depends_on:
@@ -106,3 +88,4 @@ services:
 volumes:
   pgdata:
   uploads_data:
+

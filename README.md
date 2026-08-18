@@ -155,7 +155,9 @@ Compose задаёт разумные значения по умолчанию. 
 | `MOBILE_PUBLIC_BASE_URL` | Только с `docker-compose.mobile.yml`: тот же URL, что вводите в приложении (`http://<LAN>:8888`), чтобы ссылки `/static/...` были с телефона открываемы |
 | `CORS_ORIGINS` | `*` или список origin через запятую (см. `CORSMiddleware` в `app/main.py`) |
 | `UPLOAD_DIR` | Каталог загрузок (в образе по умолчанию `/app/uploads`) |
-| `OPENAI_API_KEY` | Для живых ответов ассистента (`/api/v1/assistant/...`); без ключа — 503 |
+| `ASSISTANT_PROVIDER` | Провайдер ассистента: `rules` (без LLM) или `llamacpp_http` (локальная модель через llama.cpp server) |
+| `ASSISTANT_BASE_URL` | Базовый URL OpenAI-compatible сервера (например `http://llm:8080/v1` в Compose) |
+| `ASSISTANT_MODEL` | Имя модели (для логов/совместимости, llama.cpp может игнорировать) |
 
 Пример локального `.env` для разработки не в Docker (Postgres на `localhost`):
 
@@ -164,6 +166,34 @@ DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/technostrelka
 SECRET_KEY=local-dev-secret
 ADMIN_API_KEY=local-admin
 PUBLIC_BASE_URL=http://localhost:8000
+```
+
+## Ассистент без внешних AI сервисов (бесплатная модель)
+
+Мы не меняем эндпоинты мобильного приложения:
+- `POST /api/v1/assistant/chat`
+- `POST /api/v1/assistant/route-quiz`
+
+Варианты:
+- **`ASSISTANT_PROVIDER=rules`**: всегда работает, не требует модели (ответы детерминированные, с контекстом из БД).
+- **`ASSISTANT_PROVIDER=llamacpp_http`**: бесплатная локальная модель через **llama.cpp server** (OpenAI-compatible).
+
+### Быстрый запуск локальной модели через Docker Compose
+
+1. Скачайте GGUF модель (бесплатно). Рекомендация: **Qwen2.5-0.5B-Instruct (Q4_K_M)**:
+   - файл: `qwen2.5-0.5b-instruct-q4_k_m.gguf`
+   - положите в `./models/`
+2. Запустите LLM сервис:
+
+```bash
+docker compose --profile llm up -d llm
+```
+
+3. В `.env` включите:
+
+```env
+ASSISTANT_PROVIDER=llamacpp_http
+ASSISTANT_BASE_URL=http://llm:8080/v1
 ```
 
 ## Тесты (happy path)

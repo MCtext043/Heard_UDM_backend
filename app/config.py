@@ -17,13 +17,20 @@ class Settings(BaseSettings):
     # Для мобильного клиента / отладки в браузере: "*" или список origin через запятую.
     cors_origins: str = "*"
 
-    openai_api_key: str = ""
-    openai_base_url: str = "https://api.openai.com/v1"
-    openai_chat_model: str = "gpt-4o-mini"
+    # --- Assistant / LLM (no external AI services required) ---
+    # Provider:
+    # - "llamacpp_http": call a local OpenAI-compatible server (e.g. llama.cpp server) via HTTP
+    # - "rules": deterministic fallback without any LLM
+    assistant_provider: str = "rules"
+    assistant_base_url: str = "http://localhost:8080/v1"
+    assistant_model: str = "Qwen2.5-0.5B-Instruct"
+    assistant_max_tokens: int = 256
+    assistant_temperature: float = 0.6
+    assistant_timeout: float = 45.0
 
-    # Тот же прокси, что в SmartWallet (POST JSON как у themc в routers/assistant.py).
-    gigachat_proxy_url: str = "https://derendyaev.ru/api/gigachat/message"
-    gigachat_model: str = "GigaChat:latest"
+    # Legacy (was used for external proxy). Kept for backward compatibility but no longer required.
+    gigachat_proxy_url: str = ""
+    gigachat_model: str = ""
     gigachat_max_tokens: int = 256
     gigachat_timeout: float = 30.0
 

@@ -1,11 +1,10 @@
-"""Тесты ИИ: разбор ответа GigaChat, route-quiz, чат с моком прокси (без сети)."""
+"""Тесты ассистента: route-quiz, чат и локальный mock (без сети)."""
 
 from __future__ import annotations
 
 import uuid
 from unittest.mock import AsyncMock
 
-import httpx
 import pytest
 from fastapi.testclient import TestClient
 
@@ -23,10 +22,12 @@ def test_clean_giga_response_json_with_content() -> None:
 
 
 def test_route_quiz_default_category_when_proxy_empty(client: TestClient, monkeypatch) -> None:
-    async def empty_proxy(*args, **kwargs):
+    assistant_mod.settings.assistant_provider = "llamacpp_http"
+
+    async def empty_llm(*args, **kwargs):
         return ""
 
-    monkeypatch.setattr(assistant_mod, "_call_gigachat_proxy", empty_proxy)
+    monkeypatch.setattr(assistant_mod, "chat_completion", empty_llm)
     r = client.post("/api/v1/assistant/route-quiz", json={"answers": {"a": 1}})
     assert r.status_code == 200
     assert r.json()["category"] == "история"
@@ -34,10 +35,12 @@ def test_route_quiz_default_category_when_proxy_empty(client: TestClient, monkey
 
 
 def test_route_quiz_parses_json_category(client: TestClient, monkeypatch) -> None:
-    async def fake_proxy(messages, **kwargs):
+    assistant_mod.settings.assistant_provider = "llamacpp_http"
+
+    async def fake_llm(messages, **kwargs):
         return '{"category": "искусство"}'
 
-    monkeypatch.setattr(assistant_mod, "_call_gigachat_proxy", fake_proxy)
+    monkeypatch.setattr(assistant_mod, "chat_completion", fake_llm)
     r = client.post("/api/v1/assistant/route-quiz", json={"answers": {"q": "x"}})
     assert r.status_code == 200
     body = r.json()
@@ -50,12 +53,14 @@ def test_chat_requires_authentication(client: TestClient) -> None:
 
 
 def test_chat_success_with_mocked_proxy(client: TestClient, monkeypatch) -> None:
-    async def fake_proxy(messages, **kwargs):
+    assistant_mod.settings.assistant_provider = "llamacpp_http"
+
+    async def fake_llm(messages, **kwargs):
         assert any(m.get("role") == "system" for m in messages)
         assert messages[-1]["role"] == "user"
         return "Visit a theater in Izhevsk."
 
-    monkeypatch.setattr(assistant_mod, "_call_gigachat_proxy", fake_proxy)
+    monkeypatch.setattr(assistant_mod, "chat_completion", fake_llm)
 
     email = f"ai_{uuid.uuid4().hex[:10]}@example.com"
     reg = client.post(
@@ -75,9 +80,10 @@ def test_chat_success_with_mocked_proxy(client: TestClient, monkeypatch) -> None
 
 
 def test_chat_empty_proxy_returns_friendly_message(client: TestClient, monkeypatch) -> None:
+    assistant_mod.settings.assistant_provider = "llamacpp_http"
     monkeypatch.setattr(
         assistant_mod,
-        "_call_gigachat_proxy",
+        "chat_completion",
         AsyncMock(return_value="   "),
     )
     email = f"ai2_{uuid.uuid4().hex[:10]}@example.com"
@@ -96,14 +102,17 @@ def test_chat_empty_proxy_returns_friendly_message(client: TestClient, monkeypat
         json={"message": "?" },
     )
     assert r.status_code == 200
-    assert "ошибк" in r.json()["reply"].lower()
+    low = r.json()["reply"].lower()
+    assert ("события из базы" in low) or ("скажи, пожалуйста" in low)
 
 
 def test_chat_timeout_returns_friendly_message(client: TestClient, monkeypatch) -> None:
-    async def timeout_proxy(*a, **k):
-        raise httpx.TimeoutException("timeout")
+    assistant_mod.settings.assistant_provider = "llamacpp_http"
 
-    monkeypatch.setattr(assistant_mod, "_call_gigachat_proxy", timeout_proxy)
+    async def timeout_llm(*a, **k):
+        raise RuntimeError("timeout")
+
+    monkeypatch.setattr(assistant_mod, "chat_completion", timeout_llm)
     email = f"ai3_{uuid.uuid4().hex[:10]}@example.com"
     client.post(
         "/api/v1/auth/register",
@@ -119,4 +128,5 @@ def test_chat_timeout_returns_friendly_message(client: TestClient, monkeypatch) 
         json={"message": "hi"},
     )
     assert r.status_code == 200
-    assert "не отвечает" in r.json()["reply"].lower()
+    low = r.json()["reply"].lower()
+    assert ("события из базы" in low) or ("скажи, пожалуйста" in low)
